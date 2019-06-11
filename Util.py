@@ -160,6 +160,18 @@ def steer(angle):
     final = ((10 * angle+sign(angle))**3) / 20
     return cap(final,-1,1)
 
+def throttle(speed, agent_speed):
+    final = ((speed - agent_speed)/100)
+    if final > 0.55:
+        boost = True
+    else:
+        boost = False
+
+    if final > -0.55:
+        return cap(final,0,1),boost
+    else:
+        return cap(final,-1,1),boost
+
 def angle2(target_location,object_location):
     difference = toLocation(target_location) - toLocation(object_location)
     return math.atan2(difference.data[1], difference.data[0])
@@ -188,7 +200,7 @@ def distance2D(target_object, our_object):
 
 def dodging(agent):
     time_diff = time.time() - agent.start
-    if time_diff < 1.2 :
+    if time_diff < 1.3 :
         return True
     return False
 

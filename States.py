@@ -5,23 +5,6 @@ from Util import *
 
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 
-# class recover:
-#     def __init__(self): 
-#         self.expired = False
-
-#     def available(self, agent):
-#         r = agent.me.rotation
-#         l = agent.me.location
-
-#         if not agent.me.grounded and agent.me.location.data[2] > 100: #create function to check if the object is rotated up
-#             return True
-#         return False
-
-#     def execute(self, agent):
-
-
-
-
 class wait:
     def __init__(self):
         self.expired = False
@@ -198,45 +181,46 @@ class quickShot:
         return agent.controller(agent, target_location, speed)
 
 def calcController(agent, target_object, target_speed):
+    goal_local = toLocal([0, -sign(agent.team)*FIELD_LENGTH/2, 100], agent.me)
+    goal_angle = math.atan2(goal_local.data[1], goal_local.data[0])
+    
     loc = toLocal(target_object, agent.me)
     controller_state = SimpleControllerState()
     
     angle_to_targ = math.atan2(loc.data[1],loc.data[0])
 
     current_speed = velocity2D(agent.me)
+    distance = distance2D(target_object, agent.me)
 
     #steering 
     controller_state.steer = steer(angle_to_targ)
 
 
     # throttle
-    if target_speed > current_speed:
-        controller_state.throttle = 1.0
-        if target_speed > 1400 and target_speed > current_speed and agent.start > 2.2 and current_speed < 2250:
-            controller_state.boost = True
-    elif target_speed < current_speed:
-        controller_state.throttle = 0
-    
-    isdodging = False
+    if agent.ball.location.data[0] == 0 and agent.ball.location.data[1] == 0:
+        controller_state.throttle, controller_state.boost = 1, True
+    else:
+        controller_state.throttle, controller_state.boost = throttle(target_speed,current_speed)
+
 
     #dodging
-    # time_diff = time.time() - agent.start 
-    # if time_diff > 2.2 and distance2D(target_object, agent.me) <= 270:
-    #     agent.start = time.time()
-    # elif time_diff <= 0.1:
-    #     controller_state.jump = True
-    #     controller_state.pitch = -1
-    # elif time_diff >= 0.1 and time_diff <= 0.15:
-    #     controller_state.jump = False
-    #     controller_state.pitch = -1
-    # elif time_diff > 0.15 and time_diff < 1:
-    #     controller_state.jump = True
-    #     controller_state.yaw = math.sin(goal_angle)
-    #     controller_state.pitch = -abs(math.cos(goal_angle))
+    time_diff = time.time() - agent.start 
+    if (time_diff > 2.2 and distance <= 150) or (time_diff > 4 and distance >= 1000):
+        agent.start = time.time()
+    elif time_diff <= 0.1:
+        controller_state.jump = True
+        controller_state.pitch = -1
+    elif time_diff >= 0.1 and time_diff <= 0.15:
+        controller_state.jump = False
+        controller_state.pitch = -1
+    elif time_diff > 0.15 and time_diff < 1:
+        controller_state.jump = True
+        controller_state.yaw = math.sin(goal_angle)
+        controller_state.pitch = -abs(math.cos(goal_angle))
         
     if not dodging(agent) and not agent.me.grounded:
         print(f'recovering {timeZ(agent.me)}')
-        target = agent.ball.velocity.normalize()
+        target = agent.me.velocity.normalize()
         targ_local = to_local(target.scale(500), agent.me)
 
         return recoveryController(agent, targ_local)
@@ -253,24 +237,22 @@ def shotController(agent, target_object, target_speed):
     angle_to_targ = math.atan2(loc.data[1],loc.data[0])
 
     current_speed = velocity2D(agent.me)
+    distance = distance2D(target_object, agent.me)
 
     #steering 
     controller_state.steer = steer(angle_to_targ)
 
-
     # throttle
-    if target_speed > current_speed:
-        controller_state.throttle = 1.0
-        if target_speed > 1400 and target_speed > current_speed and agent.start > 2.2 and current_speed < 2250:
-            controller_state.boost = True
-    elif target_speed < current_speed:
-        controller_state.throttle = 0
+    if agent.ball.location.data[0] == 0 and agent.ball.location.data[1] == 0:
+        controller_state.throttle, controller_state.boost = 1, True
+    else:
+        controller_state.throttle, controller_state.boost = throttle(target_speed,current_speed)
 
     time_diff = time.time() - agent.start 
 
     #dodging
     time_diff = time.time() - agent.start 
-    if time_diff > 2.2 and distance2D(target_object, agent.me) <= 270:
+    if (time_diff > 2.2 and distance <= 270) or (time_diff > 4 and distance >= 1000):
         agent.start = time.time()
     elif time_diff <= 0.1:
         controller_state.jump = True
@@ -283,9 +265,9 @@ def shotController(agent, target_object, target_speed):
         controller_state.yaw = math.sin(goal_angle)
         controller_state.pitch = -abs(math.cos(goal_angle))
 
-    if not dodging(agent) and not agent.me.grounded :
+    if not dodging(agent) and not agent.me.grounded:
         print(f'recovering {timeZ(agent.me)}')
-        target = agent.ball.velocity.normalize()
+        target = agent.me.velocity.normalize()
         targ_local = to_local(target.scale(500), agent.me)
 
         return recoveryController(agent, targ_local)
@@ -325,16 +307,37 @@ def waitController(agent, target, speed):
     return controller_state
 
 def recoveryController(agent, local): #accepts agent, the agent's controller, and a target (in local coordinates)
-    c = SimpleControllerState()
+    controller_state = SimpleControllerState()
 
     turn = math.atan2(local.data[1],local.data[0])
-    up =  toLocal(Vector3([0,0,agent.me.location.data[2]]), agent.me) #figuring out what way up is in local coordinates
+    up =  toLocal(agent.me.location + Vector3([0,0,100]), agent.me)
     target = [math.atan2(up.data[1],up.data[2]), math.atan2(local.data[2],local.data[0]), turn] #determining angles each axis must turn
-    c.steer = steerPD(turn, 0)
-    c.yaw = steerPD(target[2],-agent.me.rvelocity.data[2]/5)
-    c.pitch = steerPD(target[1],agent.me.rvelocity.data[1]/5)
-    c.roll = steerPD(target[0],agent.me.rvelocity.data[0]/5)
-    return c
+    controller_state.steer = steerPD(turn, 0)
+    controller_state.yaw = steerPD(target[2],-agent.me.rvelocity.data[2]/5)
+    controller_state.pitch = steerPD(target[1],agent.me.rvelocity.data[1]/5)
+    controller_state.roll = steerPD(target[0],agent.me.rvelocity.data[0]/5)
+    return controller_state
+
+def speedDodgeController(agent, target_object, goal_angle):
+
+    controller_state = SimpleControllerState()
+
+    #dodging
+    time_diff = time.time() - agent.start 
+    if time_diff > 2.2:
+        agent.start = time.time()
+    elif time_diff <= 0.1:
+        controller_state.jump = True
+        controller_state.pitch = -1
+    elif time_diff >= 0.1 and time_diff <= 0.15:
+        controller_state.jump = False
+        controller_state.pitch = -1
+    elif time_diff > 0.15 and time_diff < 1:
+        controller_state.jump = True
+        controller_state.yaw = math.sin(goal_angle)
+        controller_state.pitch = -abs(math.cos(goal_angle))
+    
+    return controller_state
 
 def steerPD(angle,rate):
     final = ((35*(angle+rate))**3)/20
