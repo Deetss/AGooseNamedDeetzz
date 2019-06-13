@@ -61,7 +61,7 @@ class calcShot:
         #center = Vector3([0, 5150*-sign(agent.team), 200])
 
         #time stuff that we don't worry about yet
-        time_guess = 0
+        time_guess = 0 # this is set to zero, so its not really doing anything. Just assuming where the ball is right now
         bloc = future(agent.ball,time_guess)
 
         #vectors from the goalposts to the ball & to Gosling
@@ -195,6 +195,10 @@ def calcController(agent, target_object, target_speed):
     #steering 
     controller_state.steer = steer(angle_to_targ)
 
+    r = radius(current_speed)
+    slowdown = (Vector3([0,sign(target_object.data[0])*(r+40),0])-loc.flatten()).magnitude() / cap(r*1.5,1,1200)
+    target_speed = cap(current_speed*slowdown,0,current_speed)
+
 
     # throttle
     if agent.ball.location.data[0] == 0 and agent.ball.location.data[1] == 0:
@@ -205,7 +209,7 @@ def calcController(agent, target_object, target_speed):
 
     #dodging
     time_diff = time.time() - agent.start 
-    if (time_diff > 2.2 and distance <= 150) or (time_diff > 4 and distance >= 1000):
+    if (time_diff > 2.2 and distance <= 150) or (time_diff > 4 and distance >= 1000) and not kickoff(agent):
         agent.start = time.time()
     elif time_diff <= 0.1:
         controller_state.jump = True
@@ -219,7 +223,6 @@ def calcController(agent, target_object, target_speed):
         controller_state.pitch = -abs(math.cos(goal_angle))
         
     if not dodging(agent) and not agent.me.grounded:
-        print(f'recovering {timeZ(agent.me)}')
         target = agent.me.velocity.normalize()
         targ_local = to_local(target.scale(500), agent.me)
 
@@ -266,7 +269,6 @@ def shotController(agent, target_object, target_speed):
         controller_state.pitch = -abs(math.cos(goal_angle))
 
     if not dodging(agent) and not agent.me.grounded:
-        print(f'recovering {timeZ(agent.me)}')
         target = agent.me.velocity.normalize()
         targ_local = to_local(target.scale(500), agent.me)
 

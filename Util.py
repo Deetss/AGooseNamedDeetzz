@@ -65,6 +65,8 @@ class Vector3:
         return self.data[0]*value[0] + self.data[1]*value[1] + self.data[2]*value[2]
     def scale(self, scale):
         return Vector3([self.data[0] * scale, self.data[1] * scale, self.data[2] * scale])
+    def flatten(self):
+        return Vector3([self.data[0], self.data[1], 0])
 
 class obj:
     def __init__(self):
@@ -204,3 +206,10 @@ def dodging(agent):
         return True
     return False
 
+def radius(v):
+    return 139.059 + (0.1539 * v) + (0.0001267716565 * v * v)
+
+def kickoff(agent):
+    if agent.ball.location.data[0] == 0 and agent.ball.location.data[1] == 0:
+        return True
+    return False

@@ -15,9 +15,8 @@ class Deetzz(BaseAgent):
         self.start = time.time()
         self.steer_correction_radians: float = 0
 
-
-        self.state = quickShot()
-        self.controller = shotController
+        self.state = calcShot()
+        self.controller = calcController
     
     def checkState(self):
         if self.state.expired:
@@ -30,13 +29,10 @@ class Deetzz(BaseAgent):
             else:
                 self.state = quickShot()
         
-        
-
     def get_output(self, game: GameTickPacket) -> SimpleControllerState:
-        controller_state = SimpleControllerState()
-        self.preprocess(game)
+        self.preprocess(game) # Put some game data in easy to use variables
 
-        self.checkState()
+        self.checkState() # Checks to see which state the bot needs to be set to
 
         return self.state.execute(self)
     
@@ -80,5 +76,3 @@ class Deetzz(BaseAgent):
                         break
                 if flag:
                     self.players.append(temp)
-
-  
